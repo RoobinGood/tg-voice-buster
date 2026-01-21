@@ -26,6 +26,8 @@ export type Config = {
   tmpDir: string;
   ffmpegPath: string;
   audioSpeed: number;
+  telegramMessageLimit: number;
+  telegramSendDelayMs: number;
   stt: SttConfig;
   postprocessEnabled: boolean;
   llm?: LlmConfig;
@@ -84,6 +86,8 @@ const config: Config = {
   tmpDir: getOptionalEnv("TMP_DIR", "tmp"),
   ffmpegPath: getOptionalEnv("FFMPEG_PATH", "ffmpeg"),
   audioSpeed: parseNumber("AUDIO_SPEED", 1),
+  telegramMessageLimit: parseNumber("TELEGRAM_MESSAGE_LIMIT", 4000),
+  telegramSendDelayMs: parseNumber("TELEGRAM_SEND_DELAY_MS", 250),
   stt: {
     apiUrl: getRequiredEnv("STT_API_URL"),
     apiKey: getRequiredEnv("STT_API_KEY"),

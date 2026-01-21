@@ -6,7 +6,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "echo \"No tests\""
+    "test": "node --require ts-node/register --test src/**/*.test.ts"
   },
   "keywords": [],
   "author": "",

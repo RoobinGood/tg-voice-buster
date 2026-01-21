@@ -8,6 +8,7 @@ import { OpenAICompatibleSpeechToText } from "./services/openaiSpeechToText";
 import { OpenAICompatibleTextPostProcess } from "./services/openaiTextPostProcess";
 import { convertOggToMp3 } from "./utils/ffmpeg";
 import { logError, logInfo } from "./utils/logger";
+import { splitTextForTelegram, addPrefixToChunks } from "./utils/textSplit";
 
 type BotContext = FileFlavor<Context>;
 
@@ -46,6 +47,51 @@ const getUserLogData = (ctx: BotContext): { userId: number | "unknown"; username
     userId: ctx.from?.id ?? "unknown",
     username: ctx.from?.username ?? "unknown",
   };
+};
+
+const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+const sendSplitMessages = async (
+  ctx: BotContext,
+  text: string,
+  replyToMessageId?: number,
+): Promise<void> => {
+  const limit = config.telegramMessageLimit;
+  const delayMs = config.telegramSendDelayMs;
+
+  let chunks = splitTextForTelegram(text, limit);
+  
+  if (chunks.length > 1) {
+    const maxPrefixLength = 20;
+    const effectiveLimit = limit - maxPrefixLength;
+    let newChunks = splitTextForTelegram(text, effectiveLimit);
+    
+    if (newChunks.length > 1) {
+      const actualMaxPrefixLength = `${newChunks.length}/${newChunks.length}\n`.length;
+      if (actualMaxPrefixLength > maxPrefixLength) {
+        const correctedLimit = limit - actualMaxPrefixLength;
+        newChunks = splitTextForTelegram(text, correctedLimit);
+      }
+      chunks = newChunks;
+    }
+  }
+
+  const prefixedChunks = addPrefixToChunks(chunks);
+
+  for (let i = 0; i < prefixedChunks.length; i++) {
+    const chunk = prefixedChunks[i];
+    const options = i === 0 && replyToMessageId
+      ? { reply_to_message_id: replyToMessageId }
+      : {};
+
+    await ctx.reply(chunk, options);
+
+    if (i < prefixedChunks.length - 1 && delayMs > 0) {
+      await sleep(delayMs);
+    }
+  }
 };
 
 export const createBot = (): Bot<BotContext> => {
@@ -116,7 +162,7 @@ export const createBot = (): Bot<BotContext> => {
         logInfo("llm.postprocess.done", baseLog);
       }
 
-      await ctx.reply(finalText, { reply_to_message_id: messageId });
+      await sendSplitMessages(ctx, finalText, messageId);
       logInfo("message.reply.sent", { ...baseLog, textLength: finalText.length });
     } catch (error) {
       logError("message.voice.error", {
